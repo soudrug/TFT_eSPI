@@ -26,7 +26,24 @@
   #include <Fonts/Custom/Roboto_Thin_24.h>    // CF_RT24
   #include <Fonts/Custom/Satisfy_24.h>        // CF_S24
   #include <Fonts/Custom/Yellowtail_32.h>     // CF_Y32
+  // Serif fonts
+  #include <Fonts/GFXFF/FreeSerif9pt8b.h>  // FF33 or FS9
+  #include <Fonts/GFXFF/FreeSerif12pt8b.h> // FF34 or FS12
+  #include <Fonts/GFXFF/FreeSerif14pt8b.h>
+  #include <Fonts/GFXFF/FreeSerif16pt8b.h>
+  #include <Fonts/GFXFF/FreeSerif18pt8b.h> // FF35 or FS18
+  #include <Fonts/GFXFF/FreeSerif24pt8b.h> // FF36 or FS24
+  
 
+  #include <Fonts/GFXFF/FreeSerifItalic9pt7b.h>  // FF37 or FSI9
+  #include <Fonts/GFXFF/FreeSerifItalic12pt7b.h> // FF38 or FSI12
+  #include <Fonts/GFXFF/FreeSerifItalic18pt7b.h> // FF39 or FSI18
+  #include <Fonts/GFXFF/FreeSerifItalic24pt7b.h> // FF40 or FSI24
+  
+  #include <Fonts/GFXFF/FreeSerifBold9pt7b.h>  // FF41 or FSB9
+  #include <Fonts/GFXFF/FreeSerifBold12pt7b.h> // FF42 or FSB12
+  #include <Fonts/GFXFF/FreeSerifBold18pt7b.h> // FF43 or FSB18
+  #include <Fonts/GFXFF/FreeSerifBold24pt7b.h> // FF44 or FSB24
 #endif
 
 // Shorthand references - any coding scheme can be used, here CF_ = Custom Font
