@@ -15,7 +15,7 @@
 #ifndef _TFT_eSPIH_
 #define _TFT_eSPIH_
 
-#define TFT_ESPI_VERSION "1.4.1"
+#define TFT_ESPI_VERSION "1.4.5"
 
 //#define ESP32 //Just used to test ESP32 options
 
@@ -172,6 +172,13 @@
 
 #if defined (TFT_SPI_OVERLAP)
   #undef TFT_CS
+  #define SPI1U_WRITE (SPIUMOSI | SPIUSSE | SPIUCSSETUP | SPIUCSHOLD)
+  #define SPI1U_READ  (SPIUMOSI | SPIUSSE | SPIUCSSETUP | SPIUCSHOLD | SPIUDUPLEX)
+#else
+  #ifdef ESP8266
+    #define SPI1U_WRITE (SPIUMOSI | SPIUSSE)
+    #define SPI1U_READ  (SPIUMOSI | SPIUSSE | SPIUDUPLEX)
+  #endif
 #endif
 
 #ifndef TFT_CS
@@ -382,6 +389,7 @@
 
 
 #if !defined (ESP32_PARALLEL)
+
   // Read from display using SPI or software SPI
   #if defined (ESP8266) && defined (TFT_SDA_READ)
     // Use a bit banged function call for ESP8266 and bi-directional SDA pin
@@ -391,6 +399,12 @@
     // Use a SPI read transfer
     #define tft_Read_8() spi.transfer(0)
   #endif
+
+  // Make sure TFT_MISO is defined if not used to avoid an error message
+  #ifndef TFT_MISO
+    #define TFT_MISO -1
+  #endif
+
 #endif
 
 
@@ -663,7 +677,7 @@ class TFT_eSPI : public Print {
 
   // These are virtual so the TFT_eSprite class can override them with sprite specific functions
   virtual void     drawPixel(int32_t x, int32_t y, uint32_t color),
-                   drawChar(int32_t x, int32_t y, unsigned char c, uint32_t color, uint32_t bg, uint8_t size),
+                   drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size),
                    drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color),
                    drawFastVLine(int32_t x, int32_t y, int32_t h, uint32_t color),
                    drawFastHLine(int32_t x, int32_t y, int32_t w, uint32_t color),
@@ -803,11 +817,13 @@ class TFT_eSPI : public Print {
 
   void     setAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h);
 
-           // Compatibility additions (non-essential)
-  void     startWrite(void);                         // Begin SPI transaction (not normally needed)
+           // Compatibility additions
+  void     startWrite(void);                         // Begin SPI transaction
   void     writeColor(uint16_t color, uint32_t len); // Write colours without transaction overhead
   void     endWrite(void);                           // End SPI transaction
 
+  uint16_t decodeUTF8(uint8_t *buf, uint16_t *index, uint16_t remaining);
+  uint16_t decodeUTF8(uint8_t c);
   size_t   write(uint8_t);
 
 #ifdef TFT_SDA_READ
@@ -817,6 +833,10 @@ class TFT_eSPI : public Print {
   void     begin_SDA_Read(void);
   void     end_SDA_Read(void);
 #endif
+
+  // Set or get an arbitrary library attribute or configuration option
+  void     setAttribute(uint8_t id = 0, uint8_t a = 0);
+  uint8_t  getAttribute(uint8_t id = 0);
 
   void     getSetup(setup_t& tft_settings); // Sketch provides the instance to populate
 
@@ -832,6 +852,9 @@ class TFT_eSPI : public Print {
 
   int16_t _xpivot;   // x pivot point coordinate
   int16_t _ypivot;   // x pivot point coordinate
+
+  uint8_t  decoderState = 0;   // UTF8 decoder state
+  uint16_t decoderBuffer;      // Unicode code-point buffer
 
  private:
 
@@ -867,17 +890,19 @@ class TFT_eSPI : public Print {
 
   uint32_t fontsloaded;
 
-  uint8_t  glyph_ab,  // glyph height above baseline
-           glyph_bb;  // glyph height below baseline
+  uint8_t  glyph_ab,   // glyph delta Y (height) above baseline
+           glyph_bb;   // glyph delta Y (height) below baseline
 
-  bool     isDigits;  // adjust bounding box for numbers to reduce visual jiggling
+  bool     isDigits;   // adjust bounding box for numbers to reduce visual jiggling
   bool     textwrapX, textwrapY;   // If set, 'wrap' text at right and optionally bottom edge of display
   bool     _swapBytes; // Swap the byte order for TFT pushImage()
   bool     locked, inTransaction; // Transaction and mutex lock flags for ESP32
 
-  bool     _booted;
+  bool     _booted;    // init() or begin() has already run once
+  bool     _cp437;     // If set, use correct CP437 charset (default is ON)
+  bool     _utf8;      // If set, use UTF-8 decoder in print stream 'write()' function (default ON)
 
-  uint32_t _lastColor;
+  uint32_t _lastColor; // Buffered value of last colour used
 
 #ifdef LOAD_GFXFF
   GFXfont  *gfxFont;

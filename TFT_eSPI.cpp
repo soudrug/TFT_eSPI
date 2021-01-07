@@ -13,6 +13,7 @@
   Bodmer: Added RPi 16 bit display support
  ****************************************************/
 
+
 #include "TFT_eSPI.h"
 
 #if defined (ESP32)
@@ -48,23 +49,25 @@ uint8_t readByte(void);
 // GPIO parallel input/output control
 void busDir(uint32_t mask, uint8_t mode);
 
-// If the SPI library has transaction support, these functions
-// establish settings and protect from interference from other
-// libraries.  Otherwise, they simply do nothing.
-
 inline void TFT_eSPI::spi_begin(void){
 #if defined (SPI_HAS_TRANSACTION) && defined (SUPPORT_TRANSACTIONS) && !defined(ESP32_PARALLEL)
   if (locked) {locked = false; spi.beginTransaction(SPISettings(SPI_FREQUENCY, MSBFIRST, TFT_SPI_MODE)); CS_L;}
 #else
   CS_L;
 #endif
+#ifdef ESP8266
+  SPI1U = SPI1U_WRITE;
+#endif
 }
 
 inline void TFT_eSPI::spi_end(void){
 #if defined (SPI_HAS_TRANSACTION) && defined (SUPPORT_TRANSACTIONS) && !defined(ESP32_PARALLEL)
   if(!inTransaction) {if (!locked) {locked = true; CS_H; spi.endTransaction();}}
+  #ifdef ESP8266
+    SPI1U = SPI1U_READ;
+  #endif
 #else
-  CS_H;
+  if(!inTransaction) CS_H;
 #endif
 }
 
@@ -77,6 +80,9 @@ inline void TFT_eSPI::spi_begin_read(void){
   #endif
    CS_L;
 #endif
+#ifdef ESP8266
+  SPI1U = SPI1U_READ;
+#endif
 }
 
 inline void TFT_eSPI::spi_end_read(void){
@@ -86,25 +92,42 @@ inline void TFT_eSPI::spi_end_read(void){
   #if !defined(ESP32_PARALLEL)
     spi.setFrequency(SPI_FREQUENCY);
   #endif
-   CS_H;
+   if(!inTransaction) CS_H;
+#endif
+#ifdef ESP8266
+  SPI1U = SPI1U_WRITE;
 #endif
 }
 
 #if defined (TOUCH_CS) && defined (SPI_TOUCH_FREQUENCY) // && !defined(ESP32_PARALLEL)
 
   inline void TFT_eSPI::spi_begin_touch(void){
+   CS_H; // Just in case it has been left low
+
   #if defined (SPI_HAS_TRANSACTION) && defined (SUPPORT_TRANSACTIONS)
     if (locked) {locked = false; spi.beginTransaction(SPISettings(SPI_TOUCH_FREQUENCY, MSBFIRST, SPI_MODE0));}
   #else
     spi.setFrequency(SPI_TOUCH_FREQUENCY);
   #endif
+
+  #ifdef ESP8266
+    SPI1U = SPI1U_READ;
+  #endif
+
+  T_CS_L;
   }
 
   inline void TFT_eSPI::spi_end_touch(void){
+  T_CS_H;
+
   #if defined (SPI_HAS_TRANSACTION) && defined (SUPPORT_TRANSACTIONS)
     if(!inTransaction) {if (!locked) {locked = true; spi.endTransaction();}}
   #else
     spi.setFrequency(SPI_FREQUENCY);
+  #endif
+
+  #ifdef ESP8266
+    SPI1U = SPI1U_WRITE;
   #endif
   }
 
@@ -195,7 +218,9 @@ TFT_eSPI::TFT_eSPI(int16_t w, int16_t h)
   locked = true;        // ESP32 transaction mutex lock flags
   inTransaction = false;
 
-  _booted = true;
+  _booted   = true;
+  _cp437    = true;
+  _utf8     = true;
 
   addr_row = 0xFFFF;
   addr_col = 0xFFFF;
@@ -279,7 +304,8 @@ void TFT_eSPI::init(uint8_t tc)
     spi.pins(6, 7, 8, 0);
   #endif
 
-    spi.begin(); // This will set HMISO to input
+  spi.begin(); // This will set HMISO to input
+
 #else
   #if !defined(ESP32_PARALLEL)
     #if defined (TFT_MOSI) && !defined (TFT_SPI_OVERLAP)
@@ -313,7 +339,7 @@ void TFT_eSPI::init(uint8_t tc)
     spi.setHwCs(1); // Use hardware SS toggling
   #endif
 #endif
-  
+
   // Set to output once again in case D6 (MISO) is used for DC
 #ifdef TFT_DC
     digitalWrite(TFT_DC, HIGH); // Data/Command high = data mode
@@ -321,6 +347,7 @@ void TFT_eSPI::init(uint8_t tc)
 #endif
 
     _booted = false;
+    spi_end();
   } // end of: if just _booted
 
   // Toggle RST low to reset
@@ -337,17 +364,6 @@ void TFT_eSPI::init(uint8_t tc)
   else writecommand(TFT_SWRST); // Software reset
 #else
   writecommand(TFT_SWRST); // Software reset
-#endif
-
-#if defined (TFT_BL) && defined (TFT_BACKLIGHT_ON)
-  digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
-  pinMode(TFT_BL, OUTPUT);
-#else
-  #if defined (TFT_BL) && defined (M5STACK)
-    // Turn on the back-light LED
-    digitalWrite(TFT_BL, HIGH);
-    pinMode(TFT_BL, OUTPUT);
-  #endif
 #endif
 
   spi_end();
@@ -404,6 +420,17 @@ void TFT_eSPI::init(uint8_t tc)
   spi_end();
 
   setRotation(rotation);
+
+#if defined (TFT_BL) && defined (TFT_BACKLIGHT_ON)
+  digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+  pinMode(TFT_BL, OUTPUT);
+#else
+  #if defined (TFT_BL) && defined (M5STACK)
+    // Turn on the back-light LED
+    digitalWrite(TFT_BL, HIGH);
+    pinMode(TFT_BL, OUTPUT);
+  #endif
+#endif
 }
 
 
@@ -471,8 +498,6 @@ void TFT_eSPI::commandList (const uint8_t *addr)
   uint8_t  numArgs;
   uint8_t  ms;
 
-  spi_begin();
-
   numCommands = pgm_read_byte(addr++);   // Number of commands to follow
 
   while (numCommands--)                  // For each command...
@@ -493,7 +518,7 @@ void TFT_eSPI::commandList (const uint8_t *addr)
       delay( (ms==255 ? 500 : ms) );
     }
   }
-  spi_end();
+
 }
 
 
@@ -680,14 +705,14 @@ uint16_t TFT_eSPI::readPixel(int32_t x0, int32_t y0)
   // Dummy read to throw away don't care value
   tft_Read_8();
   
-  #if !defined (ILI9488_DRIVER)
+  //#if !defined (ILI9488_DRIVER)
 
     // Read the 3 RGB bytes, colour is actually only in the top 6 bits of each byte
     // as the TFT stores colours as 18 bits
     uint8_t r = tft_Read_8();
     uint8_t g = tft_Read_8();
     uint8_t b = tft_Read_8();
-
+/*
   #else
 
     // The 6 colour bits are in MS 6 bits of each byte, but the ILI9488 needs an extra clock pulse
@@ -697,7 +722,7 @@ uint16_t TFT_eSPI::readPixel(int32_t x0, int32_t y0)
     uint8_t b = (tft_Read_8()&0x7E)<<1;
 
   #endif
-
+*/
   CS_H;
 
   #ifdef TFT_SDA_READ
@@ -1822,8 +1847,9 @@ void TFT_eSPI::drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t col
 
   drawFastHLine(x, y, w, color);
   drawFastHLine(x, y + h - 1, w, color);
-  drawFastVLine(x, y, h, color);
-  drawFastVLine(x + w - 1, y, h, color);
+  // Avoid drawing corner pixels twice
+  drawFastVLine(x, y+1, h-2, color);
+  drawFastVLine(x + w - 1, y+1, h-2, color);
 
   inTransaction = false;
   spi_end();
@@ -2267,21 +2293,22 @@ int16_t TFT_eSPI::textWidth(const char *string)
 
 int16_t TFT_eSPI::textWidth(const char *string, uint8_t font)
 {
-  int32_t str_width  = 0;
+  int32_t str_width = 0;
+  uint16_t uniCode  = 0;
 
 #ifdef SMOOTH_FONT
   if(fontLoaded)
   {
     while (*string)
     {
-      uint16_t unicode = decodeUTF8(*string++);
-      if (unicode)
+      uniCode = decodeUTF8(*string++);
+      if (uniCode)
       {
-        if (unicode == 0x20) str_width += gFont.spaceWidth;
+        if (uniCode == 0x20) str_width += gFont.spaceWidth;
         else
         {
           uint16_t gNum = 0;
-          bool found = getUnicodeIndex(unicode, &gNum);
+          bool found = getUnicodeIndex(uniCode, &gNum);
           if (found)
           {
             if(str_width == 0 && gdX[gNum] < 0) str_width -= gdX[gNum];
@@ -2297,18 +2324,15 @@ int16_t TFT_eSPI::textWidth(const char *string, uint8_t font)
   }
 #endif
 
-  unsigned char uniCode;
-  char *widthtable;
-
   if (font>1 && font<9)
   {
-    widthtable = (char *)pgm_read_dword( &(fontdata[font].widthtbl ) ) - 32; //subtract the 32 outside the loop
+    char *widthtable = (char *)pgm_read_dword( &(fontdata[font].widthtbl ) ) - 32; //subtract the 32 outside the loop
 
     while (*string)
     {
       uniCode = *(string++);
       if (uniCode > 31 && uniCode < 128)
-      str_width += pgm_read_byte( widthtable + uniCode); // Normally we need to subract 32 from uniCode
+      str_width += pgm_read_byte( widthtable + uniCode); // Normally we need to subtract 32 from uniCode
       else str_width += pgm_read_byte( widthtable + 32); // Set illegal character = space width
     }
   }
@@ -2320,10 +2344,10 @@ int16_t TFT_eSPI::textWidth(const char *string, uint8_t font)
     {
       while (*string)
       {
-        uniCode = *(string++);
-        if ((uniCode >= (uint8_t)pgm_read_byte(&gfxFont->first)) && (uniCode <= (uint8_t)pgm_read_byte(&gfxFont->last )))
+        uniCode = decodeUTF8(*string++);
+        if ((uniCode >= pgm_read_word(&gfxFont->first)) && (uniCode <= pgm_read_word(&gfxFont->last )))
         {
-          uniCode -= pgm_read_byte(&gfxFont->first);
+          uniCode -= pgm_read_word(&gfxFont->first);
           GFXglyph *glyph  = &(((GFXglyph *)pgm_read_dword(&gfxFont->glyph))[uniCode]);
           // If this is not the  last character or is a digit then use xAdvance
           if (*string  || isDigits) str_width += pgm_read_byte(&glyph->xAdvance);
@@ -2388,7 +2412,7 @@ int16_t TFT_eSPI::fontHeight(void)
 ** Function name:           drawChar
 ** Description:             draw a single character in the Adafruit GLCD font
 ***************************************************************************************/
-void TFT_eSPI::drawChar(int32_t x, int32_t y, unsigned char c, uint32_t color, uint32_t bg, uint8_t size)
+void TFT_eSPI::drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size)
 {
   if ((x >= _width)            || // Clip right
       (y >= _height)           || // Clip bottom
@@ -2420,8 +2444,7 @@ void TFT_eSPI::drawChar(int32_t x, int32_t y, unsigned char c, uint32_t color, u
 #if defined (ESP8266) && !defined (ILI9488_DRIVER)
     color = (color >> 8) | (color << 8);
     bg = (bg >> 8) | (bg << 8);
-    uint32_t spimask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-    SPI1U1 = (SPI1U1 & spimask) | (15 << SPILMOSI) | (15 << SPILMISO);
+
     for (int8_t j = 0; j < 8; j++) {
       for (int8_t k = 0; k < 5; k++ ) {
         if (column[k] & mask) {
@@ -2494,17 +2517,17 @@ void TFT_eSPI::drawChar(int32_t x, int32_t y, unsigned char c, uint32_t color, u
 
 #ifdef LOAD_GFXFF
     // Filter out bad characters not present in font
-    if ((c >= (uint8_t)pgm_read_byte(&gfxFont->first)) && (c <= (uint8_t)pgm_read_byte(&gfxFont->last )))
+    if ((c >= pgm_read_word(&gfxFont->first)) && (c <= pgm_read_word(&gfxFont->last )))
     {
       spi_begin();
       inTransaction = true;
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      c -= pgm_read_byte(&gfxFont->first);
+      c -= pgm_read_word(&gfxFont->first);
       GFXglyph *glyph  = &(((GFXglyph *)pgm_read_dword(&gfxFont->glyph))[c]);
       uint8_t  *bitmap = (uint8_t *)pgm_read_dword(&gfxFont->bitmap);
 
-      uint16_t bo = pgm_read_word(&glyph->bitmapOffset);
+      uint32_t bo = pgm_read_word(&glyph->bitmapOffset);
       uint8_t  w  = pgm_read_byte(&glyph->width),
                h  = pgm_read_byte(&glyph->height);
                //xa = pgm_read_byte(&glyph->xAdvance);
@@ -2669,10 +2692,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // Column addr set
   DC_C;
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
-
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_CASET;
   SPI1CMD |= SPIBUSY;
@@ -2684,7 +2704,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
 
   DC_D;
 
-  SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+  SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
   // Load the two coords as a 32 bit value and shift in one go
   SPI1W0 = (xs >> 8) | (uint16_t)(xs << 8) | ((uint8_t)(xe >> 8)<<16 | (xe << 24));
   SPI1CMD |= SPIBUSY;
@@ -2693,7 +2713,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // Row addr set
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_PASET;
   SPI1CMD |= SPIBUSY;
@@ -2701,7 +2721,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
 
   DC_D;
 
-  SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+  SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
   // Load the two coords as a 32 bit value and shift in one go
   SPI1W0 = (ys >> 8) | (uint16_t)(ys << 8) | ((uint8_t)(ye >> 8)<<16 | (ye << 24));
   SPI1CMD |= SPIBUSY;
@@ -2710,13 +2730,14 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // write to RAM
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
   SPI1W0 = TFT_RAMWR;
   SPI1CMD |= SPIBUSY;
   while(SPI1CMD & SPIBUSY) {}
 
   DC_D;
 
+  SPI1U1 = (15 << SPILMOSI) | (15 << SPILMISO);
   //spi_end();
 }
 
@@ -2732,10 +2753,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // Column addr set
   DC_C;
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
-
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_CASET<<8;
   SPI1CMD |= SPIBUSY;
@@ -2749,7 +2767,7 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // Row addr set
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_PASET<<8;
   SPI1CMD |= SPIBUSY;
@@ -2763,12 +2781,15 @@ void TFT_eSPI::setWindow(int32_t xs, int32_t ys, int32_t xe, int32_t ye)
   // write to RAM
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
   SPI1W0 = TFT_RAMWR<<8;
   SPI1CMD |= SPIBUSY;
   while(SPI1CMD & SPIBUSY) {}
 
   DC_D;
+
+  // Re-instate SPI flags settings corrupted by SPI library writePattern() call
+  SPI1U = SPI1U_WRITE;
 
   //spi_end();
 }
@@ -2780,9 +2801,7 @@ void TFT_eSPI::setWindow(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 {
   //spi_begin(); // Must be called before setWimdow
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   // Column addr set
   DC_C;
@@ -2914,7 +2933,6 @@ void TFT_eSPI::setWindow(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 #if defined (ESP8266) && !defined (RPI_WRITE_STROBE)
 void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 {
-  spi_begin();
 
   int32_t xe = xs + w - 1;
   int32_t ye = ys + h - 1;
@@ -2932,10 +2950,7 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
   // Column addr set
   DC_C;
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
-
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_CASET;
   SPI1CMD |= SPIBUSY;
@@ -2943,7 +2958,7 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 
   DC_D;
 
-  SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+  SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
   // Load the two coords as a 32 bit value and shift in one go
   SPI1W0 = (xs >> 8) | (uint16_t)(xs << 8) | ((uint8_t)(xe >> 8)<<16 | (xe << 24));
   SPI1CMD |= SPIBUSY;
@@ -2952,7 +2967,7 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
   // Row addr set
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_PASET;
   SPI1CMD |= SPIBUSY;
@@ -2960,7 +2975,7 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 
   DC_D;
 
-  SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+  SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
   // Load the two coords as a 32 bit value and shift in one go
   SPI1W0 = (ys >> 8) | (uint16_t)(ys << 8) | ((uint8_t)(ye >> 8)<<16 | (ye << 24));
   SPI1CMD |= SPIBUSY;
@@ -2969,20 +2984,19 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
   // read from RAM
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
   SPI1W0 = TFT_RAMRD;
   SPI1CMD |= SPIBUSY;
   while(SPI1CMD & SPIBUSY) {}
 
   DC_D;
-  //spi_end();
+
 }
 
 #else //ESP32
 
 void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 {
-  spi_begin();
 
   int32_t xe = xs + w - 1;
   int32_t ye = ys + h - 1;
@@ -3021,7 +3035,6 @@ ye += rowstart;
 
   DC_D;
 
-  //spi_end();
 }
 
 #endif
@@ -3043,14 +3056,12 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 
   spi_begin();
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
   // No need to send x if it has not changed (speeds things up)
   if (addr_col != x) {
 
     DC_C;
 
-    SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+    SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
     SPI1W0 = TFT_CASET<<(CMD_BITS + 1 - 8);
     SPI1CMD |= SPIBUSY;
     while(SPI1CMD & SPIBUSY) {}
@@ -3061,7 +3072,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
     uint8_t cBin[] = { 0, (uint8_t) (x>>8), 0, (uint8_t) (x>>0)};
     spi.writePattern(&cBin[0], 4, 2);
 #else
-    SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+    SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
     // Load the two coords as a 32 bit value and shift in one go
     uint32_t xswap = (x >> 8) | (uint16_t)(x << 8);
     SPI1W0 = xswap | (xswap << 16);
@@ -3077,7 +3088,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 
     DC_C;
 
-    SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+    SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
     SPI1W0 = TFT_PASET<<(CMD_BITS + 1 - 8);
     SPI1CMD |= SPIBUSY;
@@ -3089,7 +3100,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
     uint8_t cBin[] = { 0, (uint8_t) (y>>8), 0, (uint8_t) (y>>0)};
     spi.writePattern(&cBin[0], 4, 2);
 #else
-    SPI1U1 = mask | (31 << SPILMOSI) | (31 << SPILMISO);
+    SPI1U1 = (31 << SPILMOSI) | (31 << SPILMISO);
     // Load the two coords as a 32 bit value and shift in one go
     uint32_t yswap = (y >> 8) | (uint16_t)(y << 8);
     SPI1W0 = yswap | (yswap << 16);
@@ -3102,7 +3113,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 
   DC_C;
 
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
 
   SPI1W0 = TFT_RAMWR<<(CMD_BITS + 1 - 8);
   SPI1CMD |= SPIBUSY;
@@ -3113,7 +3124,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 #if  defined (ILI9488_DRIVER)
   tft_Write_16(color);
 #else
-  SPI1U1 = mask | (15 << SPILMOSI) | (15 << SPILMISO);
+  SPI1U1 = (15 << SPILMOSI) | (15 << SPILMISO);
 
   SPI1W0 = (color >> 8) | (color << 8);
   SPI1CMD |= SPIBUSY;
@@ -3134,9 +3145,7 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 
   spi_begin();
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = SPI1U1 & mask;
-  SPI1U1 = mask | (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
+  SPI1U1 = (CMD_BITS << SPILMOSI) | (CMD_BITS << SPILMISO);
   // No need to send x if it has not changed (speeds things up)
   if (addr_col != x) {
     DC_C;
@@ -3404,9 +3413,8 @@ void TFT_eSPI::pushColors(uint16_t *data, uint32_t len, bool swap)
 
   uint32_t color[8];
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
+  SPI1U1 = (255 << SPILMOSI) | (255 << SPILMISO);
 
-  SPI1U1 = (SPI1U1 & mask) | (255 << SPILMOSI) | (255 << SPILMISO);
 
   while(len>15)
   {
@@ -3461,7 +3469,7 @@ void TFT_eSPI::pushColors(uint16_t *data, uint32_t len, bool swap)
       memcpy(color,data,len<<1);
     }
     while(SPI1CMD & SPIBUSY) {}
-    SPI1U1 = (SPI1U1 & mask) | (bits << SPILMOSI) | (bits << SPILMISO);
+    SPI1U1 = (bits << SPILMOSI) | (bits << SPILMISO);
     SPI1W0 = color[0];
     SPI1W1 = color[1];
     SPI1W2 = color[2];
@@ -3572,9 +3580,6 @@ void TFT_eSPI::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t
 
   spi_begin();
 
-  uint32_t mask = ~((SPIMMOSI << SPILMOSI) | (SPIMMISO << SPILMISO));
-  mask = (SPI1U1 & mask) | (15 << SPILMOSI) | (15 << SPILMISO);
-  SPI1U = SPIUMOSI | SPIUSSE;
   int16_t swapped_color = (color >> 8) | (color << 8);
 
   if (steep)  // y increments every iteration (y0 is x-axis, and x0 is y-axis)
@@ -3593,7 +3598,6 @@ void TFT_eSPI::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t
     if (x0 > x1) {spi_end(); return;}
 
     setWindow(y0, x0, y0, _height);
-    SPI1U1 = mask;
     SPI1W0 = swapped_color;
     for (; x0 <= x1; x0++) {
       while(SPI1CMD & SPIBUSY) {}
@@ -3606,7 +3610,6 @@ void TFT_eSPI::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t
         err += dx;
         while(SPI1CMD & SPIBUSY) {}
         setWindow(y0, x0+1, y0, _height);
-        SPI1U1 = mask;
         SPI1W0 = swapped_color;
       }
     }
@@ -3627,7 +3630,6 @@ void TFT_eSPI::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t
     if (x0 > x1) {spi_end(); return;}
 
     setWindow(x0, y0, _width, y0);
-    SPI1U1 = mask;
     SPI1W0 = swapped_color;
     for (; x0 <= x1; x0++) {
       while(SPI1CMD & SPIBUSY) {}
@@ -3640,14 +3642,12 @@ void TFT_eSPI::drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t
         err += dx;
         while(SPI1CMD & SPIBUSY) {}
         setWindow(x0+1, y0, _width, y0);
-        SPI1U1 = mask;
         SPI1W0 = swapped_color;
       }
     }
   }
 
   while(SPI1CMD & SPIBUSY) {}
-  SPI1U = SPIUMOSI | SPIUDUPLEX | SPIUSSE;
 
   spi_end();
 }
@@ -3699,7 +3699,6 @@ void TFT_eSPI::drawFastVLine(int32_t x, int32_t y, int32_t h, uint32_t color)
     
 #ifdef RPI_WRITE_STROBE
   #if defined (ESP8266)
-    // SPI1U1 will already be set to transfer 16 bits by setWindow()
     SPI1W0 = (color >> 8) | (color << 8);
     SPI1CMD |= SPIBUSY;
     while(SPI1CMD & SPIBUSY) {}
@@ -3764,7 +3763,6 @@ void TFT_eSPI::drawFastHLine(int32_t x, int32_t y, int32_t w, uint32_t color)
 
 #ifdef RPI_WRITE_STROBE
   #if defined (ESP8266)
-    // SPI1U1 will already be set to transfer 16 bits by setWindow()
     SPI1W0 = (color >> 8) | (color << 8);
     SPI1CMD |= SPIBUSY;
     while(SPI1CMD & SPIBUSY) {}
@@ -3910,6 +3908,135 @@ void TFT_eSPI::invertDisplay(boolean i)
 }
 
 
+/**************************************************************************
+** Function name:           setAttribute
+** Description:             Sets a control parameter of an attribute
+**************************************************************************/
+void TFT_eSPI::setAttribute(uint8_t attr_id, uint8_t param) {
+    switch (attr_id) {
+            break;
+        case 1:
+            _cp437 = param;
+            break;
+        case 2:
+            _utf8  = param;
+            break;
+        //case 3: // TBD future feature control
+        //    _tbd = param;
+        //    break;
+    }
+}
+
+
+/**************************************************************************
+** Function name:           getAttribute
+** Description:             Get value of an attribute (control parameter)
+**************************************************************************/
+uint8_t TFT_eSPI::getAttribute(uint8_t attr_id) {
+    switch (attr_id) {
+        case 1: // ON/OFF control of full CP437 character set
+            return _cp437;
+            break;
+        case 2: // ON/OFF control of UTF-8 decoding
+            return _utf8;
+            break;
+        //case 3: // TBD future feature control
+        //    return _tbd;
+        //    break;
+    }
+
+    return false;
+}
+
+/***************************************************************************************
+** Function name:           decodeUTF8
+** Description:             Serial UTF-8 decoder with fall-back to extended ASCII
+*************************************************************************************x*/
+#define DECODE_UTF8 // Test only, comment out to stop decoding
+uint16_t TFT_eSPI::decodeUTF8(uint8_t c)
+{
+#ifdef DECODE_UTF8
+  // 7 bit Unicode Code Point
+  if ((c & 0x80) == 0x00) {
+    decoderState = 0;
+    return (uint16_t)c;
+  }
+
+  if (decoderState == 0)
+  {
+    // 11 bit Unicode Code Point
+    if ((c & 0xE0) == 0xC0)
+    {
+      decoderBuffer = ((c & 0x1F)<<6);
+      decoderState = 1;
+      return 0;
+    }
+
+    // 16 bit Unicode Code Point
+    if ((c & 0xF0) == 0xE0)
+    {
+      decoderBuffer = ((c & 0x0F)<<12);
+      decoderState = 2;
+      return 0;
+    }
+    // 21 bit Unicode  Code Point not supported so fall-back to extended ASCII
+    if ((c & 0xF8) == 0xF0) return (uint16_t)c;
+  }
+  else
+  {
+    if (decoderState == 2)
+    {
+      decoderBuffer |= ((c & 0x3F)<<6);
+      decoderState--;
+      return 0;
+    }
+    else
+    {
+      decoderBuffer |= (c & 0x3F);
+      decoderState = 0;
+      return decoderBuffer;
+    }
+  }
+
+  decoderState = 0;
+#endif
+
+  return (uint16_t)c; // fall-back to extended ASCII
+}
+
+
+/***************************************************************************************
+** Function name:           decodeUTF8
+** Description:             Line buffer UTF-8 decoder with fall-back to extended ASCII
+*************************************************************************************x*/
+uint16_t TFT_eSPI::decodeUTF8(uint8_t *buf, uint16_t *index, uint16_t remaining)
+{
+  uint16_t c = buf[(*index)++];
+  //Serial.print("Byte from string = 0x"); Serial.println(c, HEX);
+
+#ifdef DECODE_UTF8
+  // 7 bit Unicode
+  if ((c & 0x80) == 0x00) return c;
+
+  // 11 bit Unicode
+  if (((c & 0xE0) == 0xC0) && (remaining > 1))
+    return ((c & 0x1F)<<6) | (buf[(*index)++]&0x3F);
+
+  // 16 bit Unicode
+  if (((c & 0xF0) == 0xE0) && (remaining > 2))
+  {
+    c = ((c & 0x0F)<<12) | ((buf[(*index)++]&0x3F)<<6);
+    return  c | ((buf[(*index)++]&0x3F));
+  }
+
+  // 21 bit Unicode not supported so fall-back to extended ASCII
+  // if ((c & 0xF8) == 0xF0) return c;
+#endif
+
+  return c; // fall-back to extended ASCII
+}
+
+
 /***************************************************************************************
 ** Function name:           write
 ** Description:             draw characters piped through serial stream
@@ -3918,15 +4045,17 @@ size_t TFT_eSPI::write(uint8_t utf8)
 {
   if (utf8 == '\r') return 1;
 
+  uint16_t uniCode = utf8;
+
+  if (_utf8) uniCode = decodeUTF8(utf8);
+
+  if (uniCode == 0) return 1;
+
 #ifdef SMOOTH_FONT
   if(fontLoaded)
   {
-    uint16_t unicode = decodeUTF8(utf8);
-
-    //Serial.print("UniCode="); Serial.println(unicode);
+    //Serial.print("UniCode="); Serial.println(uniCode);
     //Serial.print("UTF8   ="); Serial.println(utf8);
-
-    if (!unicode) return 1;
 
     //fontFile = SPIFFS.open( _gFontFilename, "r" );
 
@@ -3936,16 +4065,15 @@ size_t TFT_eSPI::write(uint8_t utf8)
     //  return 1;
     //}
 
-    drawGlyph(unicode);
+    drawGlyph(uniCode);
 
     //fontFile.close();
     return 1;
   }
 #endif
 
-  uint8_t uniCode = utf8;        // Work with a copy
-  if (utf8 == '\n') uniCode+=22; // Make it a valid space character to stop errors
-  else if (utf8 < 32) return 1;
+  if (uniCode == '\n') uniCode+=22; // Make it a valid space character to stop errors
+  else if (uniCode < 32) return 1;
 
   uint16_t width = 0;
   uint16_t height = 0;
@@ -3965,8 +4093,8 @@ size_t TFT_eSPI::write(uint8_t utf8)
 #ifdef LOAD_FONT2
   if (textfont == 2)
   {
-    if (utf8 > 127) return 1;
-    // This is 20us faster than using the fontdata structure (0.443ms per character instead of 0.465ms)
+    if (uniCode > 127) return 1;
+
     width = pgm_read_byte(widtbl_f16 + uniCode-32);
     height = chr_hgt_f16;
     // Font 2 is rendered in whole byte widths so we must allow for this
@@ -3982,9 +4110,8 @@ size_t TFT_eSPI::write(uint8_t utf8)
   {
     if ((textfont>2) && (textfont<9))
     {
-      if (utf8 > 127) return 1;
+      if (uniCode > 127) return 1;
       // Uses the fontinfo struct array to avoid lots of 'if' or 'switch' statements
-      // A tad slower than above but this is not significant and is more convenient for the RLE fonts
       width = pgm_read_byte( (uint8_t *)pgm_read_dword( &(fontdata[textfont].widthtbl ) ) + uniCode-32 );
       height= pgm_read_byte( &fontdata[textfont].height );
     }
@@ -4023,16 +4150,15 @@ size_t TFT_eSPI::write(uint8_t utf8)
   } // Custom GFX font
   else
   {
-
     if(utf8 == '\n') {
       cursor_x  = 0;
       cursor_y += (int16_t)textsize *
                   (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
     } else {
-      if (uniCode > (uint8_t)pgm_read_byte(&gfxFont->last )) return 1;
-      if (uniCode < (uint8_t)pgm_read_byte(&gfxFont->first)) return 1;
+      if (uniCode > pgm_read_word(&gfxFont->last )) return 1;
+      if (uniCode < pgm_read_word(&gfxFont->first)) return 1;
 
-      uint8_t   c2    = uniCode - pgm_read_byte(&gfxFont->first);
+      uint16_t   c2    = uniCode - pgm_read_word(&gfxFont->first);
       GFXglyph *glyph = &(((GFXglyph *)pgm_read_dword(&gfxFont->glyph))[c2]);
       uint8_t   w     = pgm_read_byte(&glyph->width),
                 h     = pgm_read_byte(&glyph->height);
@@ -4059,15 +4185,18 @@ size_t TFT_eSPI::write(uint8_t utf8)
 
 /***************************************************************************************
 ** Function name:           drawChar
-** Description:             draw a Unicode onto the screen
+** Description:             draw a Unicode glyph onto the screen
 ***************************************************************************************/
+  // Any UTF-8 decoding must be done before calling drawChar()
 int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y)
 {
-    return drawChar(uniCode, x, y, textfont);
+  return drawChar(uniCode, x, y, textfont);
 }
 
+  // Any UTF-8 decoding must be done before calling drawChar()
 int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
 {
+  if (!uniCode) return 0;
 
   if (font==1)
   {
@@ -4093,9 +4222,9 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
     }
     else
     {
-      if((uniCode >= pgm_read_byte(&gfxFont->first)) && (uniCode <= pgm_read_byte(&gfxFont->last) ))
+      if((uniCode >= pgm_read_word(&gfxFont->first)) && (uniCode <= pgm_read_word(&gfxFont->last) ))
       {
-        uint8_t   c2    = uniCode - pgm_read_byte(&gfxFont->first);
+        uint16_t   c2    = uniCode - pgm_read_word(&gfxFont->first);
         GFXglyph *glyph = &(((GFXglyph *)pgm_read_dword(&gfxFont->glyph))[c2]);
         return pgm_read_byte(&glyph->xAdvance) * textsize;
       }
@@ -4117,7 +4246,6 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
 #ifdef LOAD_FONT2
   if (font == 2)
   {
-    // This is faster than using the fontdata structure
     flash_address = pgm_read_dword(&chrtbl_f16[uniCode]);
     width = pgm_read_byte(widtbl_f16 + uniCode);
     height = chr_hgt_f16;
@@ -4131,7 +4259,6 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
   {
     if ((font>2) && (font<9))
     {
-      // This is slower than above but is more convenient for the RLE fonts
       flash_address = pgm_read_dword( pgm_read_dword( &(fontdata[font].chartbl ) ) + uniCode*sizeof(void *) );
       width = pgm_read_byte( (uint8_t *)pgm_read_dword( &(fontdata[font].widthtbl ) ) + uniCode );
       height= pgm_read_byte( &fontdata[font].height );
@@ -4229,6 +4356,7 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
   // Font is not 2 and hence is RLE encoded
   {
     spi_begin();
+    inTransaction = true;
 
     w *= height; // Now w is total number of pixels in the character
     if ((textsize != 1) || (textcolor == textbgcolor)) {
@@ -4279,13 +4407,10 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
           pc += line;
         }
       }
-
-      spi_end();
     }
     else // Text colour != background && textsize = 1
          // so use faster drawing of characters and background using block write
     {
-      //spi_begin();
       setWindow(x, y, x + width - 1, y + height - 1);
 
 #ifdef RPI_WRITE_STROBE
@@ -4325,9 +4450,9 @@ int16_t TFT_eSPI::drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font)
 #endif
         }
       }
-
-      spi_end();
     }
+    inTransaction = false;
+    spi_end();
   }
   // End of RLE font rendering
 #endif
@@ -4362,7 +4487,7 @@ int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY)
   return drawString(string, poX, poY, textfont);
 }
 
-// With font number
+// With font number. Note: font number is over-ridden if a smooth font is loaded
 int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY, uint8_t font)
 {
   int16_t sumX = 0;
@@ -4473,10 +4598,15 @@ int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY, uint8
     {
       cheight = (glyph_ab + glyph_bb) * textsize;
       // Get the offset for the first character only to allow for negative offsets
-      uint8_t   c2    = *string;
-      if((c2 >= pgm_read_byte(&gfxFont->first)) && (c2 <= pgm_read_byte(&gfxFont->last) ))
+      uint16_t c2 = 0;
+      uint16_t len = strlen(string);
+      uint16_t n = 0;
+
+      while (n < len && c2 == 0) c2 = decodeUTF8((uint8_t*)string, &n, len - n);
+
+      if((c2 >= pgm_read_word(&gfxFont->first)) && (c2 <= pgm_read_word(&gfxFont->last) ))
       {
-        c2 -= pgm_read_byte(&gfxFont->first);
+        c2 -= pgm_read_word(&gfxFont->first);
         GFXglyph *glyph = &(((GFXglyph *)pgm_read_dword(&gfxFont->glyph))[c2]);
         xo = pgm_read_byte(&glyph->xOffset) * textsize;
         // Adjust for negative xOffset
@@ -4491,6 +4621,9 @@ int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY, uint8
     }
 #endif
 
+  uint16_t len = strlen(string);
+  uint16_t n = 0;
+
 #ifdef SMOOTH_FONT
   if(fontLoaded)
   {
@@ -4499,21 +4632,26 @@ int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY, uint8
     //drawLine(poX, poY - 5, poX, poY + 5, TFT_GREEN);
     //fontFile = SPIFFS.open( _gFontFilename, "r");
     if(!fontFile) return 0;
-    uint16_t len = strlen(string);
-    uint16_t n = 0;
+
     setCursor(poX, poY);
 
     while (n < len)
     {
-      uint16_t unicode = decodeUTF8((uint8_t*)string, &n, len - n);
-      drawGlyph(unicode);
+      uint16_t uniCode = decodeUTF8((uint8_t*)string, &n, len - n);
+      drawGlyph(uniCode);
     }
     sumX += cwidth;
     //fontFile.close();
   }
   else
 #endif
-    while (*string) sumX += drawChar(*(string++), poX+sumX, poY, font);
+  {
+    while (n < len)
+    {
+      uint16_t uniCode = decodeUTF8((uint8_t*)string, &n, len - n);
+      sumX += drawChar(uniCode, poX+sumX, poY, font);
+    }
+  }
 
 //vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv DEBUG vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 // Switch on debugging for the padding areas
@@ -4530,6 +4668,7 @@ int16_t TFT_eSPI::drawString(const char *string, int32_t poX, int32_t poY, uint8
     {
       poX +=xo; // Adjust for negative offset start character
       poY -= glyph_ab * textsize;
+      sumX += poX;
     }
 #endif
     switch(padding) {
@@ -4695,7 +4834,7 @@ int16_t TFT_eSPI::drawFloat(float floatNumber, uint8_t dp, int32_t poX, int32_t 
   // No chance of overflow from here on
 
   // Get integer part
-  unsigned long temp = (unsigned long)floatNumber;
+  uint32_t temp = (uint32_t)floatNumber;
 
   // Put integer part into array
   ltoa(temp, str + ptr, 10);
@@ -4743,7 +4882,7 @@ void TFT_eSPI::setFreeFont(const GFXfont *f)
 
   glyph_ab = 0;
   glyph_bb = 0;
-  uint8_t numChars = pgm_read_byte(&gfxFont->last) - pgm_read_byte(&gfxFont->first);
+  uint16_t numChars = pgm_read_word(&gfxFont->last) - pgm_read_word(&gfxFont->first);
   
   // Find the biggest above and below baseline offsets
   for (uint8_t c = 0; c < numChars; c++)
@@ -4809,9 +4948,6 @@ void writeBlock(uint16_t color, uint32_t repeat)
 {
   uint16_t color16 = (color >> 8) | (color << 8);
   uint32_t color32 = color16 | color16 << 16;
-  uint32_t mask = ~(SPIMMOSI << SPILMOSI);
-  mask = SPI1U1 & mask;
-  SPI1U = SPIUMOSI | SPIUSSE;
 
   SPI1W0 = color32;
   SPI1W1 = color32;
@@ -4840,7 +4976,7 @@ void writeBlock(uint16_t color, uint32_t repeat)
   }
   if (repeat > 31)
   {
-    SPI1U1 = mask | (511 << SPILMOSI);
+    SPI1U1 = (511 << SPILMOSI);
     while(repeat>31)
     {
 #if defined SPI_FREQUENCY && (SPI_FREQUENCY == 80000000)
@@ -4856,12 +4992,11 @@ void writeBlock(uint16_t color, uint32_t repeat)
   if (repeat)
   {
     repeat = (repeat << 4) - 1;
-    SPI1U1 = mask | (repeat << SPILMOSI);
+    SPI1U1 = (repeat << SPILMOSI);
     SPI1CMD |= SPIBUSY;
     while(SPI1CMD & SPIBUSY) {}
   }
 
-  SPI1U = SPIUMOSI | SPIUDUPLEX | SPIUSSE;
 }
 
 #elif defined (ILI9488_DRIVER)
@@ -4869,10 +5004,6 @@ void writeBlock(uint16_t color, uint32_t repeat)
 #ifdef ESP8266
 void writeBlock(uint16_t color, uint32_t repeat)
 {
-
-  uint32_t mask = ~(SPIMMOSI << SPILMOSI);
-  mask = SPI1U1 & mask;
-  SPI1U = SPIUMOSI | SPIUSSE;
 
   // Split out the colours
   uint8_t r = (color & 0xF800)>>8;
@@ -4912,7 +5043,7 @@ void writeBlock(uint16_t color, uint32_t repeat)
 
   if (repeat > 20)
   {
-    SPI1U1 = mask | (503 << SPILMOSI);
+    SPI1U1 = (503 << SPILMOSI);
     while(repeat>20)
     {
       while(SPI1CMD & SPIBUSY) {}
@@ -4925,12 +5056,11 @@ void writeBlock(uint16_t color, uint32_t repeat)
   if (repeat)
   {
     repeat = (repeat * 24) - 1;
-    SPI1U1 = mask | (repeat << SPILMOSI);
+    SPI1U1 = (repeat << SPILMOSI);
     SPI1CMD |= SPIBUSY;
     while(SPI1CMD & SPIBUSY) {}
   }
 
-  SPI1U = SPIUMOSI | SPIUDUPLEX | SPIUSSE;
 }
 #else // Now the code for ESP32 and ILI9488
 
