@@ -69,26 +69,6 @@ typedef struct { // Data stored for FONT AS A WHOLE:
   #include <Fonts/GFXFF/FreeSansBoldOblique18pt7b.h> // FF31 or FSSBO18
   #include <Fonts/GFXFF/FreeSansBoldOblique24pt7b.h> // FF32 or FSSBO24
   
-  // Serif fonts
-  #include <Fonts/GFXFF/FreeSerif9pt7b.h>  // FF33 or FS9
-  #include <Fonts/GFXFF/FreeSerif12pt7b.h> // FF34 or FS12
-  #include <Fonts/GFXFF/FreeSerif18pt7b.h> // FF35 or FS18
-  #include <Fonts/GFXFF/FreeSerif24pt7b.h> // FF36 or FS24
-  
-  #include <Fonts/GFXFF/FreeSerifItalic9pt7b.h>  // FF37 or FSI9
-  #include <Fonts/GFXFF/FreeSerifItalic12pt7b.h> // FF38 or FSI12
-  #include <Fonts/GFXFF/FreeSerifItalic18pt7b.h> // FF39 or FSI18
-  #include <Fonts/GFXFF/FreeSerifItalic24pt7b.h> // FF40 or FSI24
-  
-  #include <Fonts/GFXFF/FreeSerifBold9pt7b.h>  // FF41 or FSB9
-  #include <Fonts/GFXFF/FreeSerifBold12pt7b.h> // FF42 or FSB12
-  #include <Fonts/GFXFF/FreeSerifBold18pt7b.h> // FF43 or FSB18
-  #include <Fonts/GFXFF/FreeSerifBold24pt7b.h> // FF44 or FSB24
-  
-  #include <Fonts/GFXFF/FreeSerifBoldItalic9pt7b.h>  // FF45 or FSBI9
-  #include <Fonts/GFXFF/FreeSerifBoldItalic12pt7b.h> // FF46 or FSBI12
-  #include <Fonts/GFXFF/FreeSerifBoldItalic18pt7b.h> // FF47 or FSBI18
-  #include <Fonts/GFXFF/FreeSerifBoldItalic24pt7b.h> // FF48 or FSBI24
 
 #endif // LOAD_GFXFF
 
