@@ -34,7 +34,6 @@
   #include <Fonts/GFXFF/FreeSerif18pt8b.h> // FF35 or FS18
   #include <Fonts/GFXFF/FreeSerif24pt8b.h> // FF36 or FS24
   
-
   #include <Fonts/GFXFF/FreeSerifItalic9pt7b.h>  // FF37 or FSI9
   #include <Fonts/GFXFF/FreeSerifItalic12pt7b.h> // FF38 or FSI12
   #include <Fonts/GFXFF/FreeSerifItalic18pt7b.h> // FF39 or FSI18
@@ -44,6 +43,11 @@
   #include <Fonts/GFXFF/FreeSerifBold12pt7b.h> // FF42 or FSB12
   #include <Fonts/GFXFF/FreeSerifBold18pt7b.h> // FF43 or FSB18
   #include <Fonts/GFXFF/FreeSerifBold24pt7b.h> // FF44 or FSB24
+
+  #include <Fonts/GFXFF/FreeSerifBoldItalic9pt7b.h>  // FF45 or FSBI9
+  #include <Fonts/GFXFF/FreeSerifBoldItalic12pt7b.h> // FF46 or FSBI12
+  #include <Fonts/GFXFF/FreeSerifBoldItalic18pt7b.h> // FF47 or FSBI18
+  #include <Fonts/GFXFF/FreeSerifBoldItalic24pt7b.h> // FF48 or FSBI2#endif
 #endif
 
 // Shorthand references - any coding scheme can be used, here CF_ = Custom Font
