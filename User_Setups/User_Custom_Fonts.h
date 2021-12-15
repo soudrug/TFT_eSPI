@@ -21,18 +21,18 @@
 #ifdef LOAD_GFXFF
 
   // New custom font file #includes
-  #include <Fonts/Custom/Orbitron_Light_24.h> // CF_OL24
-  #include <Fonts/Custom/Orbitron_Light_32.h> // CF_OL32
-  #include <Fonts/Custom/Roboto_Thin_24.h>    // CF_RT24
-  #include <Fonts/Custom/Satisfy_24.h>        // CF_S24
-  #include <Fonts/Custom/Yellowtail_32.h>     // CF_Y32
+  // #include <Fonts/Custom/Orbitron_Light_24.h> // CF_OL24
+  // #include <Fonts/Custom/Orbitron_Light_32.h> // CF_OL32
+  // #include <Fonts/Custom/Roboto_Thin_24.h>    // CF_RT24
+  // #include <Fonts/Custom/Satisfy_24.h>        // CF_S24
+  // #include <Fonts/Custom/Yellowtail_32.h>     // CF_Y32
   // Serif fonts
   #include <Fonts/GFXFF/FreeSerif9pt8b.h>  // FF33 or FS9
   #include <Fonts/GFXFF/FreeSerif12pt8b.h> // FF34 or FS12
   #include <Fonts/GFXFF/FreeSerif14pt8b.h>
   #include <Fonts/GFXFF/FreeSerif16pt8b.h>
   #include <Fonts/GFXFF/FreeSerif18pt8b.h> // FF35 or FS18
-  #include <Fonts/GFXFF/FreeSerif24pt8b.h> // FF36 or FS24
+  //#include <Fonts/GFXFF/FreeSerif24pt8b.h> // FF36 or FS24
   
   #include <Fonts/GFXFF/FreeSerifItalic9pt7b.h>  // FF37 or FSI9
   #include <Fonts/GFXFF/FreeSerifItalic12pt7b.h> // FF38 or FSI12
