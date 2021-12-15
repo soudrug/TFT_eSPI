@@ -14,7 +14,7 @@
   #else
     // Community RP2040 board package by Earle Philhower
     //SPIClass& spi = SPI; // will use board package default pins
-    SPIClassRP2040 spi = SPIClassRP2040(spi0, TFT_MISO, -1, TFT_SCLK, TFT_MOSI);
+    SPIClassRP2040 spi = SPIClassRP2040(SPI_X, TFT_MISO, -1, TFT_SCLK, TFT_MOSI);
   #endif
 #endif
 
@@ -201,17 +201,17 @@ void TFT_eSPI::pushBlock(uint16_t color, uint32_t len)
     uint32_t br = b<<8 | r;
     uint32_t gb = g<<8 | b;
     // Must wait before changing to 16 bit
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
-    spi_set_format(spi0,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
+    spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
     while ( len > 1 ) {
-      while (!spi_is_writable(spi0)){}; spi_get_hw(spi0)->dr = rg;
-      while (!spi_is_writable(spi0)){}; spi_get_hw(spi0)->dr = br;
-      while (!spi_is_writable(spi0)){}; spi_get_hw(spi0)->dr = gb;
+      while (!spi_is_writable(SPI_X)){}; spi_get_hw(SPI_X)->dr = rg;
+      while (!spi_is_writable(SPI_X)){}; spi_get_hw(SPI_X)->dr = br;
+      while (!spi_is_writable(SPI_X)){}; spi_get_hw(SPI_X)->dr = gb;
       len -= 2;
     }
     // Must wait before changing back to 8 bit
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
-    spi_set_format(spi0,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
+    spi_set_format(SPI_X,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
   }
 
   // Mop up the remaining pixels
@@ -250,8 +250,8 @@ void TFT_eSPI::pushPixels(const void* data_in, uint32_t len){
 void TFT_eSPI::pushBlock(uint16_t color, uint32_t len){
   while(len--)
   {
-    while (!spi_is_writable(spi0)){};
-    spi_get_hw(spi0)->dr = (uint32_t)color;
+    while (!spi_is_writable(SPI_X)){};
+    spi_get_hw(SPI_X)->dr = (uint32_t)color;
   }
 }
 
@@ -264,8 +264,8 @@ void TFT_eSPI::pushPixels(const void* data_in, uint32_t len){
   if (_swapBytes) {
     while(len--)
     {
-      while (!spi_is_writable(spi0)){};
-      spi_get_hw(spi0)->dr = (uint32_t)(*data++);
+      while (!spi_is_writable(SPI_X)){};
+      spi_get_hw(SPI_X)->dr = (uint32_t)(*data++);
     }
   }
   else
@@ -274,8 +274,8 @@ void TFT_eSPI::pushPixels(const void* data_in, uint32_t len){
     {
       uint16_t color = *data++;
       color = color >> 8 | color << 8;
-      while (!spi_is_writable(spi0)){};
-      spi_get_hw(spi0)->dr = (uint32_t)color;
+      while (!spi_is_writable(SPI_X)){};
+      spi_get_hw(SPI_X)->dr = (uint32_t)color;
     }
   }
 }
@@ -303,8 +303,8 @@ bool TFT_eSPI::dmaBusy(void) {
   if (!DMA_Enabled) return false;
 
   if (dma_channel_is_busy(dma_tx_channel)) return true;
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
-  spi_set_format(spi0,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
+  spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
   return false;
 }
 
@@ -315,8 +315,8 @@ bool TFT_eSPI::dmaBusy(void) {
 void TFT_eSPI::dmaWait(void)
 {
   while (dma_channel_is_busy(dma_tx_channel));
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
-  spi_set_format(spi0,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
+  spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
 }
 
 /***************************************************************************************
@@ -330,7 +330,7 @@ void TFT_eSPI::pushPixelsDMA(uint16_t* image, uint32_t len)
   dmaWait();
 
   channel_config_set_bswap(&dma_tx_config, !_swapBytes);
-  dma_channel_configure(dma_tx_channel, &dma_tx_config, &spi_get_hw(spi0)->dr, (uint16_t*)image, len, true);
+  dma_channel_configure(dma_tx_channel, &dma_tx_config, &spi_get_hw(SPI_X)->dr, (uint16_t*)image, len, true);
 }
 
 /***************************************************************************************
@@ -365,7 +365,7 @@ void TFT_eSPI::pushImageDMA(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t
   // If image is clipped, copy pixels into a contiguous block
   if ( (dw != w) || (dh != h) ) {
     for (int32_t yb = 0; yb < dh; yb++) {
-      memcpy((uint8_t*) (buffer + yb * dw), (uint8_t*) (image + dx + w * (yb + dy)), dw << 1);
+      memmove((uint8_t*) (buffer + yb * dw), (uint8_t*) (image + dx + w * (yb + dy)), dw << 1);
     }
   }
   // else, if a buffer pointer has been provided copy whole image to the buffer
@@ -378,7 +378,7 @@ void TFT_eSPI::pushImageDMA(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t
   setAddrWindow(x, y, dw, dh);
 
   channel_config_set_bswap(&dma_tx_config, !_swapBytes);
-  dma_channel_configure(dma_tx_channel, &dma_tx_config, &spi_get_hw(spi0)->dr, (uint16_t*)buffer, len, true);
+  dma_channel_configure(dma_tx_channel, &dma_tx_config, &spi_get_hw(SPI_X)->dr, (uint16_t*)buffer, len, true);
 
 }
 
@@ -389,12 +389,14 @@ void TFT_eSPI::pushImageDMA(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t
 bool TFT_eSPI::initDMA(bool ctrl_cs)
 {
   if (DMA_Enabled) return false;
+  
+  ctrl_cs = ctrl_cs; // stop unused parameter warning
 
   dma_tx_channel = dma_claim_unused_channel(true);
   dma_tx_config = dma_channel_get_default_config(dma_tx_channel);
   
   channel_config_set_transfer_data_size(&dma_tx_config, DMA_SIZE_16);
-  channel_config_set_dreq(&dma_tx_config, spi_get_index(spi0) ? DREQ_SPI1_TX : DREQ_SPI0_TX);
+  channel_config_set_dreq(&dma_tx_config, spi_get_index(SPI_X) ? DREQ_SPI1_TX : DREQ_SPI0_TX);
 
   DMA_Enabled = true;
   return true;

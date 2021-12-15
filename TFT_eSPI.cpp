@@ -1272,7 +1272,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *d
   {
     int32_t len = dw;
     uint16_t* ptr = data;
-    int32_t px = x;
+    int32_t px = x, sx = x;
     bool move = true;
     uint16_t np = 0;
 
@@ -1280,7 +1280,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *d
     {
       if (transp != *ptr)
       {
-        if (move) { move = false; setWindow(px, y, xe, ye); }
+        if (move) { move = false; sx = px; }
         lineBuf[np] = *ptr;
         np++;
       }
@@ -1289,14 +1289,15 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *d
         move = true;
         if (np)
         {
-           pushPixels((uint16_t*)lineBuf, np);
-           np = 0;
+          setWindow(sx, y, sx + np - 1, y);
+          pushPixels((uint16_t*)lineBuf, np);
+          np = 0;
         }
       }
       px++;
       ptr++;
     }
-    if (np) pushPixels((uint16_t*)lineBuf, np);
+    if (np) { setWindow(sx, y, sx + np - 1, y); pushPixels((uint16_t*)lineBuf, np); }
 
     y++;
     data += w;
@@ -1361,7 +1362,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, const uint1
   while (dh--) {
     int32_t len = dw;
     uint16_t* ptr = (uint16_t*)data;
-    int32_t px = x;
+    int32_t px = x, sx = x;
     bool move = true;
 
     uint16_t np = 0;
@@ -1369,21 +1370,22 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, const uint1
     while (len--) {
       uint16_t color = pgm_read_word(ptr);
       if (transp != color) {
-        if (move) { move = false; setWindow(px, y, xe, ye); }
+        if (move) { move = false; sx = px; }
         lineBuf[np] = color;
         np++;
       }
       else {
         move = true;
         if (np) {
-           pushPixels(lineBuf, np);
-           np = 0;
+          setWindow(sx, y, sx + np - 1, y);
+          pushPixels(lineBuf, np);
+          np = 0;
         }
       }
       px++;
       ptr++;
     }
-    if (np) pushPixels(lineBuf, np);
+    if (np) { setWindow(sx, y, sx + np - 1, y); pushPixels(lineBuf, np); }
 
     y++;
     data += w;
@@ -1694,13 +1696,13 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
       uint8_t* ptr = data;
       uint8_t* linePtr = (uint8_t*)lineBuf;
 
-      int32_t px = x;
+      int32_t px = x, sx = x;
       bool move = true;
       uint16_t np = 0;
 
       while (len--) {
         if (transp != *ptr) {
-          if (move) { move = false; setWindow(px, y, xe, ye);}
+          if (move) { move = false; sx = px; }
           uint8_t color = *ptr;
 
           // Shifts are slow so check if colour has changed first
@@ -1718,6 +1720,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
         else {
           move = true;
           if (np) {
+            setWindow(sx, y, sx + np - 1, y);
             pushPixels(lineBuf, np);
             linePtr = (uint8_t*)lineBuf;
             np = 0;
@@ -1727,7 +1730,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
         ptr++;
       }
 
-      if (np) pushPixels(lineBuf, np);
+      if (np) { setWindow(sx, y, sx + np - 1, y); pushPixels(lineBuf, np); }
       y++;
       data += w;
     }
@@ -1749,7 +1752,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
       uint32_t len = dw;
       uint8_t * ptr = data;
 
-      int32_t px = x;
+      int32_t px = x, sx = x;
       bool move = true;
       uint16_t np = 0;
 
@@ -1758,7 +1761,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
       if (splitFirst) {
         index = (*ptr & 0x0F);  // odd = bits 3 .. 0
         if (index != transp) {
-          move = false; setWindow(px, y, xe, ye);
+          move = false; sx = px;
           lineBuf[np] = cmap[index];
           np++;
         }
@@ -1775,7 +1778,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
         uint16_t index = ((color & 0xF0) >> 4) & 0x0F;  // high bits are the even numbers
         if (index != transp) {
           if (move) {
-            move = false; setWindow(px, y, xe, ye);
+            move = false; sx = px;
           }
           lineBuf[np] = cmap[index];
           np++; // added a pixel
@@ -1783,6 +1786,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
         else {
           move = true;
           if (np) {
+            setWindow(sx, y, sx + np - 1, y);
             pushPixels(lineBuf, np);
             np = 0;
           }
@@ -1794,7 +1798,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
           index = color & 0x0F; // the odd number is 3 .. 0
           if (index != transp) {
             if (move) {
-              move = false; setWindow(px, y, xe, ye);
+              move = false; sx = px;
              }
             lineBuf[np] = cmap[index];
             np++;
@@ -1802,6 +1806,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
           else {
             move = true;
             if (np) {
+              setWindow(sx, y, sx + np - 1, y);
               pushPixels(lineBuf, np);
               np = 0;
             }
@@ -1815,6 +1820,7 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
       }
 
       if (np) {
+        setWindow(sx, y, sx + np - 1, y);
         pushPixels(lineBuf, np);
         np = 0;
       }
@@ -1830,29 +1836,30 @@ void TFT_eSPI::pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t *da
 
     for (int32_t yp = dy;  yp < dy + dh; yp++)
     {
-      int32_t px = x;
+      int32_t px = x, sx = x;
       bool move = true;
       for (int32_t xp = dx; xp < dx + dw; xp++)
       {
         if (data[(xp>>3)] & (0x80 >> (xp & 0x7))) {
           if (move) {
             move = false;
-            setWindow(px, y, xe, ye);
+            sx = px;
           }
           np++;
         }
         else {
+          move = true;
           if (np) {
+            setWindow(sx, y, sx + np - 1, y);
             pushBlock(bitmap_fg, np);
             np = 0;
-            move = true;
           }
         }
         px++;
       }
       y++;
       data += ww;
-      if (np) { pushBlock(bitmap_fg, np); np = 0; }
+      if (np) { setWindow(sx, y, sx + np - 1, y); pushBlock(bitmap_fg, np); np = 0; }
     }
   }
   _swapBytes = swap; // Restore old value
@@ -2900,7 +2907,7 @@ void TFT_eSPI::drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32
     uint8_t mask = 0x1;
     begin_tft_write();
 
-    setWindow(xd, yd, xd+5, yd+8);
+    setWindow(xd, yd, xd+5, yd+7);
 
     for (int8_t i = 0; i < 5; i++ ) column[i] = pgm_read_byte(font + (c * 5) + i);
     column[5] = 0;
@@ -3090,38 +3097,42 @@ void TFT_eSPI::setWindow(int32_t x0, int32_t y0, int32_t x1, int32_t y1)
 
   // Temporary solution is to include the RP2040 optimised code here
   #if defined(ARDUINO_ARCH_RP2040) && !defined(TFT_PARALLEL_8BIT)
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_C;
     #if !defined (SPI_18BIT_DRIVER)
-      spi_set_format(spi0,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+      #if  defined (RPI_DISPLAY_TYPE) // RPi TFT type always needs 16 bit transfers
+      	spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+      #else
+        spi_set_format(SPI_X,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+      #endif
     #endif
-    spi_get_hw(spi0)->dr = (uint32_t)TFT_CASET;
+    spi_get_hw(SPI_X)->dr = (uint32_t)TFT_CASET;
 
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_D;
-    spi_get_hw(spi0)->dr = (uint32_t)x0>>8;
-    spi_get_hw(spi0)->dr = (uint32_t)x0;
-    spi_get_hw(spi0)->dr = (uint32_t)x1>>8;
-    spi_get_hw(spi0)->dr = (uint32_t)x1;
+    spi_get_hw(SPI_X)->dr = (uint32_t)x0>>8;
+    spi_get_hw(SPI_X)->dr = (uint32_t)x0;
+    spi_get_hw(SPI_X)->dr = (uint32_t)x1>>8;
+    spi_get_hw(SPI_X)->dr = (uint32_t)x1;
 
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_C;
-    spi_get_hw(spi0)->dr = (uint32_t)TFT_PASET;
+    spi_get_hw(SPI_X)->dr = (uint32_t)TFT_PASET;
 
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_D;
-    spi_get_hw(spi0)->dr = (uint32_t)y0>>8;
-    spi_get_hw(spi0)->dr = (uint32_t)y0;
-    spi_get_hw(spi0)->dr = (uint32_t)y1>>8;
-    spi_get_hw(spi0)->dr = (uint32_t)y1;
+    spi_get_hw(SPI_X)->dr = (uint32_t)y0>>8;
+    spi_get_hw(SPI_X)->dr = (uint32_t)y0;
+    spi_get_hw(SPI_X)->dr = (uint32_t)y1>>8;
+    spi_get_hw(SPI_X)->dr = (uint32_t)y1;
 
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_C;
-    spi_get_hw(spi0)->dr = (uint32_t)TFT_RAMWR;
+    spi_get_hw(SPI_X)->dr = (uint32_t)TFT_RAMWR;
 
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     #if !defined (SPI_18BIT_DRIVER)
-      spi_set_format(spi0, 16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+      spi_set_format(SPI_X, 16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
     #endif
     DC_D;
 
@@ -3166,40 +3177,40 @@ void TFT_eSPI::readAddrWindow(int32_t xs, int32_t ys, int32_t w, int32_t h)
 
   // Temporary solution is to include the RP2040 optimised code here
 #if defined(ARDUINO_ARCH_RP2040) && !defined(TFT_PARALLEL_8BIT)
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_set_format(spi0,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_CASET;
+  spi_set_format(SPI_X,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_CASET;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_D;
-  spi_get_hw(spi0)->dr = (uint32_t)xs>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)xs;
-  spi_get_hw(spi0)->dr = (uint32_t)xe>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)xe;
+  spi_get_hw(SPI_X)->dr = (uint32_t)xs>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)xs;
+  spi_get_hw(SPI_X)->dr = (uint32_t)xe>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)xe;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_PASET;
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_PASET;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_D;
-  spi_get_hw(spi0)->dr = (uint32_t)ys>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)ys;
-  spi_get_hw(spi0)->dr = (uint32_t)ye>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)ye;
+  spi_get_hw(SPI_X)->dr = (uint32_t)ys>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)ys;
+  spi_get_hw(SPI_X)->dr = (uint32_t)ye>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)ye;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_RAMRD;
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_RAMRD;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
-  //spi_set_format(spi0, 8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
+  //spi_set_format(SPI_X, 8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
   DC_D;
 
   // Flush the rx buffer and reset overflow flag
-  while (spi_is_readable(spi0)) (void)spi_get_hw(spi0)->dr;
-  spi_get_hw(spi0)->icr = SPI_SSPICR_RORIC_BITS;
+  while (spi_is_readable(SPI_X)) (void)spi_get_hw(SPI_X)->dr;
+  spi_get_hw(SPI_X)->icr = SPI_SSPICR_RORIC_BITS;
 
 #else
   // Column addr set
@@ -3280,65 +3291,73 @@ void TFT_eSPI::drawPixel(int32_t x, int32_t y, uint32_t color)
 
   // Since the SPI functions do not terminate until transmission is complete
   // a busy check is not needed.
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_set_format(spi0,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_CASET;
+  #if  defined (RPI_DISPLAY_TYPE) // RPi TFT type always needs 16 bit transfers
+   	spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  #else
+    spi_set_format(SPI_X,  8, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  #endif
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_CASET;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS){};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS){};
   DC_D;
-  spi_get_hw(spi0)->dr = (uint32_t)x>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)x;
-  spi_get_hw(spi0)->dr = (uint32_t)x>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)x;
+  spi_get_hw(SPI_X)->dr = (uint32_t)x>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)x;
+  spi_get_hw(SPI_X)->dr = (uint32_t)x>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)x;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_PASET;
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_PASET;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_D;
-  spi_get_hw(spi0)->dr = (uint32_t)y>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)y;
-  spi_get_hw(spi0)->dr = (uint32_t)y>>8;
-  spi_get_hw(spi0)->dr = (uint32_t)y;
+  spi_get_hw(SPI_X)->dr = (uint32_t)y>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)y;
+  spi_get_hw(SPI_X)->dr = (uint32_t)y>>8;
+  spi_get_hw(SPI_X)->dr = (uint32_t)y;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
   DC_C;
-  spi_get_hw(spi0)->dr = (uint32_t)TFT_RAMWR;
+  spi_get_hw(SPI_X)->dr = (uint32_t)TFT_RAMWR;
 
   #if defined (SPI_18BIT_DRIVER) // SPI 18 bit colour
     uint8_t r = (color & 0xF800)>>8;
     uint8_t g = (color & 0x07E0)>>3;
     uint8_t b = (color & 0x001F)<<3;
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_D;
     tft_Write_8N(r); tft_Write_8N(g); tft_Write_8N(b);
   #else
-    while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+    while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
     DC_D;
-    spi_get_hw(spi0)->dr = (uint32_t)color>>8;
-    spi_get_hw(spi0)->dr = (uint32_t)color;
+    #if  defined (RPI_DISPLAY_TYPE) // RPi TFT type always needs 16 bit transfers
+      spi_get_hw(SPI_X)->dr = (uint32_t)color;
+    #else
+      spi_get_hw(SPI_X)->dr = (uint32_t)color>>8;
+      spi_get_hw(SPI_X)->dr = (uint32_t)color;
+    #endif
   #endif
 /*
   // Subsequent pixel reads work OK without draining the FIFO...
   // Drain RX FIFO, then wait for shifting to finish (which may be *after*
   // TX FIFO drains), then drain RX FIFO again
-  while (spi_is_readable(spi0))
-      (void)spi_get_hw(spi0)->dr;
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS)
+  while (spi_is_readable(SPI_X))
+      (void)spi_get_hw(SPI_X)->dr;
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS)
       tight_loop_contents();
-  while (spi_is_readable(spi0))
-      (void)spi_get_hw(spi0)->dr;
+  while (spi_is_readable(SPI_X))
+      (void)spi_get_hw(SPI_X)->dr;
 //*/
 
 //  Subsequent pixel reads work without this
-//  spi_get_hw(spi0)->icr = SPI_SSPICR_RORIC_BITS;
+//  spi_get_hw(SPI_X)->icr = SPI_SSPICR_RORIC_BITS;
 
-  while (spi_get_hw(spi0)->sr & SPI_SSPSR_BSY_BITS) {};
+  while (spi_get_hw(SPI_X)->sr & SPI_SSPSR_BSY_BITS) {};
 
   // Next call will start with 8 bit command so changing to 16 bit not needed here
-  //spi_set_format(spi0,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
+  //spi_set_format(SPI_X,  16, (spi_cpol_t)0, (spi_cpha_t)0, SPI_MSB_FIRST);
 
 #else
 
@@ -4980,5 +4999,8 @@ void TFT_eSPI::getSetup(setup_t &tft_settings)
   #include "Extensions/Smooth_font.cpp"
 #endif
 
+#ifdef AA_GRAPHICS
+  #include "Extensions/AA_graphics.cpp"  // Loaded if SMOOTH_FONT is defined by user
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////
 

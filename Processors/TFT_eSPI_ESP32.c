@@ -8,21 +8,41 @@
 
 // Select the SPI port to use, ESP32 has 2 options
 #if !defined (TFT_PARALLEL_8_BIT)
-  #ifdef USE_HSPI_PORT
-    SPIClass spi = SPIClass(HSPI);
-  #else // use default VSPI port
-    //SPIClass& spi = SPI;
-    SPIClass spi = SPIClass(VSPI);
+  #ifdef CONFIG_IDF_TARGET_ESP32
+    #ifdef USE_HSPI_PORT
+      SPIClass spi = SPIClass(HSPI);
+    #else // use default VSPI port
+      //SPIClass& spi = SPI;
+      SPIClass spi = SPIClass(VSPI);
+    #endif
+  #else
+    #ifdef USE_HSPI_PORT
+      SPIClass spi = SPIClass(HSPI);
+    #else // use FSPI port
+      //SPIClass& spi = SPI;
+      SPIClass spi = SPIClass(FSPI);
+    #endif
   #endif
 #endif
 
 #ifdef ESP32_DMA
   // DMA SPA handle
   spi_device_handle_t dmaHAL;
-  #ifdef USE_HSPI_PORT
-    spi_host_device_t spi_host = HSPI_HOST;
+  #ifdef CONFIG_IDF_TARGET_ESP32
+    #define DMA_CHANNEL 1
+    #ifdef USE_HSPI_PORT
+      spi_host_device_t spi_host = HSPI_HOST;
+    #else // use VSPI port
+      spi_host_device_t spi_host = VSPI_HOST;
+    #endif
   #else
-    spi_host_device_t spi_host = VSPI_HOST;
+    #ifdef USE_HSPI_PORT
+      #define DMA_CHANNEL 2
+      spi_host_device_t spi_host = (spi_host_device_t) DMA_CHANNEL; // Draws once then freezes
+    #else // use FSPI port
+      #define DMA_CHANNEL 1
+      spi_host_device_t spi_host = (spi_host_device_t) DMA_CHANNEL; // Draws once then freezes
+    #endif
   #endif
 #endif
 
@@ -757,7 +777,7 @@ bool TFT_eSPI::initDMA(bool ctrl_cs)
     .pre_cb = 0, //dc_callback, //Callback to handle D/C line
     .post_cb = 0
   };
-  ret = spi_bus_initialize(spi_host, &buscfg, 1);
+  ret = spi_bus_initialize(spi_host, &buscfg, DMA_CHANNEL);
   ESP_ERROR_CHECK(ret);
   ret = spi_bus_add_device(spi_host, &devcfg, &dmaHAL);
   ESP_ERROR_CHECK(ret);
