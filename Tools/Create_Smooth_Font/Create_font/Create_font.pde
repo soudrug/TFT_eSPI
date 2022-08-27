@@ -127,14 +127,15 @@ int fontNumber = -1; // << Use [Number] in brackets from the fonts listed.
 //                                                  the font numbers are listed when the sketch is run.
 //                |         1         2     |       Maximum filename size for SPIFFS is 31 including leading /
 //                 1234567890123456789012345        and added point size and .vlw extension, so max is 25
-String fontName = "Final-Frontier";  // Manually crop the filename length later after creation if needed
+//String fontName = "Final-Frontier";  // Manually crop the filename length later after creation if needed
                                      // Note: SPIFFS does NOT accept underscore in a filename!
+String fontName  ="NotoSans-Bold";                                   
 String fontType = ".ttf";
 //String fontType = ".otf";
 
 
 // Define the font size in points for the TFT_eSPI font file
-int  fontSize = 28;
+int  fontSize =36;
 
 // Font size to use in the Processing sketch display window that pops up (can be different to above)
 int displayFontSize = 28;
@@ -159,8 +160,8 @@ static final int[] unicodeBlocks = {
   // Block range,   //Block name, Code points, Assigned characters, Scripts
   // First, last,   //Range is inclusive of first and last codes
   0x0021, 0x007E, //Basic Latin, 128, 128, Latin (52 characters), Common (76 characters)
-  //0x0080, 0x00FF, //Latin-1 Supplement, 128, 128, Latin (64 characters), Common (64 characters)
-  //0x0100, 0x017F, //Latin Extended-A, 128, 128, Latin
+  0x0080, 0x00FF, //Latin-1 Supplement, 128, 128, Latin (64 characters), Common (64 characters)
+  0x0100, 0x017F, //Latin Extended-A, 128, 128, Latin
   //0x0180, 0x024F, //Latin Extended-B, 208, 208, Latin
   //0x0250, 0x02AF, //IPA Extensions, 96, 96, Latin
   //0x02B0, 0x02FF, //Spacing Modifier Letters, 80, 80, Bopomofo (2 characters), Latin (14 characters), Common (64 characters)
