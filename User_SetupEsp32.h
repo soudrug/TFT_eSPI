@@ -163,20 +163,20 @@
 #define TFT_SCLK 18
 #define TFT_RST  -1  // Set TFT_RST to -1 if display RESET is connected to ESP32 board RST
 
-// #define TFT_OLD_PINS_ASSIGNMENT
+// #define TFT_OLD_PINS_ASSIGNMENT //proto board
 // #define TFT_CS   5  // Chip select control pin
 // #define TFT_DC   4  // Data Command control pin
 // #define TOUCH_CS 2     // Chip select pin (T_CS) of touch screen
 
-#define TFT_NEW_PINS_ASSIGNMENT
+#define TFT_NEW_PINS_ASSIGNMENT //meteoboard
 #define TFT_CS   4  // Chip select control pin
 #define TFT_DC   2  // Data Command control pin
 #define TOUCH_CS 5     // Chip select pin (T_CS) of touch screen
 
-// #define TFT_WS2_PINS
-// #define TFT_CS   5  // Chip select control pin
-// #define TFT_DC   4  // Data Command control pin
-// #define TOUCH_CS 15     // Chip select pin (T_CS) of touch screen
+//  #define TFT_WS2_PINS
+//  #define TFT_CS   5  // Chip select control pin
+//  #define TFT_DC   4  // Data Command control pin
+//  #define TOUCH_CS 15     // Chip select pin (T_CS) of touch screen
 
 
 
