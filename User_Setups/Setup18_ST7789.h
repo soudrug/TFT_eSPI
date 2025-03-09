@@ -17,11 +17,24 @@
 
 
 // My ST7789 display has TCT_CS wired permananently low so the pin is not defined here
-
 // For NodeMCU - use pin numbers in the form PIN_Dx where Dx is the NodeMCU pin designation
-#define TFT_DC   PIN_D3  // Data Command control pin
-#define TFT_RST  PIN_D4  // Reset pin (could connect to NodeMCU RST, see next line)
+#if defined(ARDUINO_LOLIN_C3_MINI)
+#warning Using pins for Lolin c3 mini
+#define TFT_DC   0  // Data Command control pin
+#define TFT_RST  2  // Reset pin (could connect to NodeMCU RST, see next line)
+#define TFT_SCLK 1
+#define TFT_MISO 3
+#define TFT_MOSI 4
+#elif defined(ESP32)
+#warning Using pins for ESP32
+#define TFT_DC   4  // Data Command control pin
+#define TFT_RST  -1  // Reset pin (could connect to NodeMCU RST, see next line)
+#else
+# error "No pins congiured"
+#endif
 
+#define TFT_WIDTH  240
+#define TFT_HEIGHT 240
 
 #define LOAD_GLCD   // Font 1. Original Adafruit 8 pixel font needs ~1820 bytes in FLASH
 #define LOAD_FONT2  // Font 2. Small 16 pixel high font, needs ~3534 bytes in FLASH, 96 characters

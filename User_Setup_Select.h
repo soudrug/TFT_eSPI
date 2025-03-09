@@ -24,8 +24,7 @@
 
 // Only ONE line below should be uncommented to define your setup.  Add extra lines and files as needed.
 
-#include <User_Setup.h>           // Default setup is root library folder
-#endif
+//#include <User_Setup.h>           // Default setup is root library folder
 
 //#include <User_Setups/Setup1_ILI9341.h>  // Setup file for ESP8266 configured for my ILI9341
 //#include <User_Setups/Setup2_ST7735.h>   // Setup file for ESP8266 configured for my ST7735
@@ -33,7 +32,7 @@
 //#include <User_Setups/Setup4_S6D02A1.h>  // Setup file for ESP8266 configured for my S6D02A1
 //#include <User_Setups/Setup5_RPi_ILI9486.h>        // Setup file for ESP8266 configured for my stock RPi TFT
 //#include <User_Setups/Setup6_RPi_Wr_ILI9486.h>     // Setup file for ESP8266 configured for my modified RPi TFT
-//#include <User_Setups/Setup7_ST7735_128x128.h>     // Setup file for ESP8266 configured for my ST7735 128x128 display
+//#include <User_Setups/Setup7_ST7735_128x128.h>     // Setup for 1.8 TFT
 //#include <User_Setups/Setup8_ILI9163_128x128.h>    // Setup file for ESP8266 configured for my ILI9163 128x128 display
 //#include <User_Setups/Setup9_ST7735_Overlap.h>     // Setup file for ESP8266 configured for my ST7735
 //#include <User_Setups/Setup10_RPi_touch_ILI9486.h> // Setup file for ESP8266 configured for ESP8266 and RPi TFT with touch
@@ -74,7 +73,7 @@
 
 //#include <User_Setups/Setup36_RPi_touch_ST7796.h>      // Setup file configured for ESP32 and RPi ST7796 TFT with touch
 
-//#include <User_Setups/Setup42_ILI9341_ESP32.h>           // Setup file for ESP32 and SPI ILI9341 240x320
+#include <User_Setups/Setup42_ILI9341_ESP32.h>           // Setup file for ESP32 and SPI ILI9341 240x320
 //#include <User_Setups/Setup43_ST7735.h>            // Setup file for ESP8266 & ESP32 configured for my ST7735S 80x160
 //#include <User_Setups/Setup44_TTGO_CameraPlus.h>   // Setup file for ESP32 and TTGO T-CameraPlus ST7789 SPI bus TFT    240x240
 //#include <User_Setups/Setup45_TTGO_T_Watch.h>      // Setup file for ESP32 and TTGO T-Watch ST7789 SPI bus TFT  240x240

@@ -130,15 +130,17 @@ int fontNumber = -1; // << Use [Number] in brackets from the fonts listed.
 //String fontName = "Final-Frontier";  // Manually crop the filename length later after creation if needed
                                      // Note: SPIFFS does NOT accept underscore in a filename!
 String fontName  ="NotoSans-Bold";                                   
+//String fontName  ="NotoSans-Regular";
 String fontType = ".ttf";
 //String fontType = ".otf";
 
 
 // Define the font size in points for the TFT_eSPI font file
-int  fontSize =36;
+int  fontSize = 80;
 
 // Font size to use in the Processing sketch display window that pops up (can be different to above)
-int displayFontSize = 28;
+//int displayFontSize = 100;
+int displayFontSize = fontSize;
 
 // Create a C header (.h file) ready to be used or copied in your sketch folder
 boolean createHeaderFile = true;
@@ -159,9 +161,10 @@ static final int[] unicodeBlocks = {
 
   // Block range,   //Block name, Code points, Assigned characters, Scripts
   // First, last,   //Range is inclusive of first and last codes
-  0x0021, 0x007E, //Basic Latin, 128, 128, Latin (52 characters), Common (76 characters)
-  0x0080, 0x00FF, //Latin-1 Supplement, 128, 128, Latin (64 characters), Common (64 characters)
-  0x0100, 0x017F, //Latin Extended-A, 128, 128, Latin
+  //0x0021, 0x007E, //Basic Latin, 128, 128, Latin (52 characters), Common (76 characters)
+  0x0030, 0x003A, //Basic Latin, numbers only and : 
+  //0x0080, 0x00FF, //Latin-1 Supplement, 128, 128, Latin (64 characters), Common (64 characters) //Need for Czech
+  //0x0100, 0x017F, //Latin Extended-A, 128, 128, Latin //Need for Czech
   //0x0180, 0x024F, //Latin Extended-B, 208, 208, Latin
   //0x0250, 0x02AF, //IPA Extensions, 96, 96, Latin
   //0x02B0, 0x02FF, //Spacing Modifier Letters, 80, 80, Bopomofo (2 characters), Latin (14 characters), Common (64 characters)
